@@ -1,4 +1,4 @@
-m%% 20180318 SinalPositionMatrixGenerator by MSBak
+%% 20180318 SinalPositionMatrixGenerator by MSBak
 % CNMF_E 이후, 필요한 data를 matrix 형태로 가공함
 
 % msSignal : (neuron #, frame) = siganl raw value가 기록됨

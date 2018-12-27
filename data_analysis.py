@@ -1,378 +1,328 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Oct 26 17:26:39 2018
+Created on Sun Dec 23 12:37:45 2018
 
 @author: msbak
 """
 
 import pandas as pd
-import matplotlib_venn as venn
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats.stats import pearsonr
+import hdf5storage
 
-#filename = '‪C:\\Python\\itgidx.xlsx'
-
-filepath = 'GPF201808_#1.4_itgidx.xlsx'
-itg_idx_start = pd.read_excel(filepath, header=None)
-
-#import matplotlib.pyplot as plt
-
-# In[]
-
-def venn_diagram(itg_idx_3columns, set1_name, set2_name, set3_name):
-    
-#    print(itg_idx_3columns)
-    itg_idx = itg_idx_3columns
-    itg_idx.columns = range(itg_idx.shape[1])
-    
-#    print(itg_idx)
-    
-    #  1 set
-    for day in itg_idx.columns:
-        cnt = 0
-        for neuronNum in itg_idx.index:
-            temp = itg_idx.iloc[neuronNum, day]
-            if not(0 == temp):
-                cnt += 1
-                
-        if day == 0:
-            set1_pure = cnt
-        elif day == 1:
-            set2_pure = cnt
-        elif day == 2:
-            set3_pure = cnt
-    
-    #  2 set merge
-    
-    two_set_merge_list = [[0,1],[0,2],[1,2]]
-#    three_set_merge_list = [1,2,3]
-    
-    for two_set in two_set_merge_list:
-        cnt = 0
-    
-        dayA = two_set[0]
-        dayB = two_set[1]
-        
-        for neuronNum in itg_idx.index:
-            temp = list([itg_idx.iloc[neuronNum,dayA],itg_idx.iloc[neuronNum,dayB]])
-            if not(0 in temp):
-                cnt += 1
-                
-        if two_set == [0,1]:
-            set1_2_merge = cnt
-        elif two_set == [0,2]:
-            set1_3_merge = cnt
-        elif two_set == [1,2]:
-            set2_3_merge = cnt
-            
-            
-    #  3 set merge
-            
+def zeromean(array):
+    sum1 = 0
     cnt = 0
-    for neuronNum in itg_idx.index:
-        temp = list(itg_idx.iloc[neuronNum,:])
-        if not(0 in temp):
+    for value1 in array:
+        if not (value1==0):
+            sum1 += value1
             cnt += 1
-        
-        set1_2_3_merge = cnt
-          
-    #  calculation
-        
-    set1_pure = set1_pure - set1_2_merge - set1_3_merge + set1_2_3_merge
-    set2_pure = set2_pure - set1_2_merge - set2_3_merge + set1_2_3_merge
-    set3_pure = set3_pure - set1_3_merge - set2_3_merge + set1_2_3_merge
+            
+    zeromean = sum1/cnt
+    return zeromean
+
+# In[] msPeak_signal load
     
-    set1_2_merge = set1_2_merge - set1_2_3_merge
-    set2_3_merge = set2_3_merge - set1_2_3_merge
-    set1_3_merge = set1_3_merge - set1_2_3_merge
-    
-    return venn.venn3(subsets = (set1_pure, set2_pure, set1_2_merge, set3_pure, set1_3_merge, set2_3_merge, set1_2_3_merge), \
-                      set_labels = (set1_name, set2_name, set3_name))
-    
-# In[]
+# itgidx
+filepath1 = 'itgidx.xlsx'
+itgidx = np.array(pd.read_excel(filepath1, header=None))
 
-plt.figure(1)
-venn_diagram(itg_idx_start.iloc[:,0:3], 'day1', 'day2', 'day3')
-
-plt.figure(2) 
-venn_diagram(itg_idx_start.iloc[:,1:4], 'day2', 'day3', 'day4')
-
-
-
-# In[]
-
-def overlapping_calc_var_day(itg_idx_3columns, calc_list):
-    mslist = []
-    sw = 1
-    for gaplist in calc_list:
-        cnt = 0
-        if len(np.shape(calc_list)) != 1:
-            dayA = gaplist[0]
-            dayB = gaplist[1]
-        elif len(np.shape(calc_list)) == 1:
-            dayA = calc_list[0]
-            dayB = calc_list[1]
-            
-        if sw:
-            for neuronNum in itg_idx_3columns.index:
-                temp = list([itg_idx_3columns.iloc[neuronNum,dayA],itg_idx_3columns.iloc[neuronNum,dayB]])
-                if not(0 in temp):
-                    cnt += 1
-                    
-            dayA_list = list(itg_idx_3columns.iloc[:,dayA])
-            dayB_list = list(itg_idx_3columns.iloc[:,dayB])
-                    
-            total_neuron = (len(dayA_list) - dayA_list.count(0)) + (len(dayB_list) - dayB_list.count(0)) - cnt
-            cnt = cnt/total_neuron
-            
-            print('day', str(dayA+1), 'and day', str(dayB+1), ' total_neuron ', str(total_neuron))
-            
-            mslist.append(cnt)
-            
-            if len(np.shape(calc_list)) == 1:
-                sw = 0
+# signal
+loadlist = list(['F:\\Miniscope imaging data\\Analysis\\201808\\GPF201808_#1.4_CtxA\\GPF201808_#1.4_CtxA_day1_SignalMatrix.mat', \
+                'F:\\Miniscope imaging data\\Analysis\\201808\\GPF201808_#1.4_CtxA\\GPF201808_#1.4_CtxA_day2_SignalMatrix.mat', \
+                'F:\\Miniscope imaging data\\Analysis\\201808\\GPF201808_#1.4_CtxA\\GPF201808_#1.4_CtxA_day3_SignalMatrix.mat', \
+                'F:\\Miniscope imaging data\\Analysis\\201808\\GPF201808_#1.4_CtxA\\GPF201808_#1.4_CtxA_day4_SignalMatrix.mat'])
+                # 추후 수정요망 
                 
-    return mslist
+msPeak_signal = np.zeros((len(loadlist),185,8330)) # 추후 수정요망 
+signal_matrix = np.zeros((itgidx.shape[0],itgidx.shape[1],8330))
 
-overlap_in_1day_gap = [[0,1],[1,2],[2,3]]
-overlap_in_2day_gap = [[0,2],[1,3]]
-overlap_in_3day_gap = [0,3]
+for filename in np.arange(len(loadlist)):
+    mat_tmp = hdf5storage.loadmat(loadlist[filename])
+    mat_signal_tmp = mat_tmp['msPeak_signal']
 
-print(overlapping_calc(itg_idx_start, overlap_in_1day_gap))
-print(overlapping_calc(itg_idx_start, overlap_in_2day_gap))
-print(overlapping_calc(itg_idx_start, overlap_in_3day_gap))
-
-
-dayA_list = list(itg_idx_start.iloc[:,0])
-
-# In[]
-
-def overlapping_calc(matrix1): # pandas dataframe
-    days_num = matrix1.shape[1]
-    itg_idx_len = matrix1.shape[0]
-    
-    save_neuron = np.zeros((days_num,days_num))
-    save_signal = np.zeros((days_num,days_num))
-    
-    for dayA in np.arange(days_num):
-        for dayB in np.arange(days_num):
-            dayA_siganl = np.array(matrix1.iloc[:,dayA])
-            dayB_siganl = np.array(matrix1.iloc[:,dayB])
+    for neuron in np.arange(mat_signal_tmp.shape[0]): 
+        itg_index = list(itgidx[:,filename]).index(neuron+1) # matlab to python
+        signal_matrix[itg_index,filename,0:mat_signal_tmp.shape[1]] = mat_signal_tmp[neuron,:]
+        if not(filename==0) and itg_index == 0:
+            print(filename, neuron, itg_index )
             
-            neuron_both_cnt = 0
-            neuron_A_cnt = 0
-            
-            signal_both_cnt = 0
-            signal_A_cnt = 0
-            for ix in np.arange(itg_idx_len):              
-                if (dayA_siganl[ix] > 0 and dayB_siganl[ix] > 0): # both signal A ∩ B 
-                    neuron_both_cnt += 1
-                    signal_both_cnt += np.abs(dayA_siganl[ix] - dayB_siganl[ix])
-                
-                if dayA_siganl[ix] > 0:
-                    neuron_A_cnt += 1 # A signal
-                    signal_A_cnt += dayA_siganl[ix]
-       
-            save_neuron[dayA,dayB] = neuron_both_cnt/neuron_A_cnt # A, B의 'neuron' overlap ratio = A neuron ∩ B neuron / A neuron
-            save_signal[dayA,dayB] = 1 - signal_both_cnt/signal_A_cnt # A, B의 'signal' overlap ratio = 1 - (|(A signal - B signal)| / A signal)
-            
+
+ans = np.sum(signal_matrix, axis = 2)
+
+
     
-    return save_neuron, save_signal 
-                    
+# In[] freezing index load for day3
+syn = 14 # notebook 1 frame 때, miniscope frame
+tr = 1.3 # time range
+filepath = 'F:\\Miniscope imaging data\\Analysis\\201808\\GPF201808_#1.4_CtxA\\GPF201808_#1.4_CtxA_day3_freezing.xlsx'
+df1 = pd.read_excel(filepath, header=None)
+
+freeizng_index = np.array(df1.iloc[2:,0:2])
+freezing_start = list(freeizng_index[:,0])
+
+#    plot_ms = np.zeros(30*tr*2)
+signal_sum = np.zeros(signal_matrix.shape[0])
+
+signal_freezing_by = list()
+signal_freezing_by_overlap_filter = list()
+freeizng_freeizng_by = list()
+
+training = np.sum(signal_matrix[:,1,600:7860],axis=1) # training sesion matrix
+test1 = np.sum(signal_matrix[:,2,740:4752],axis=1) # training sesion matrix
+
+overlap_mask = (test1 * training > 0)
+
+for ix in np.arange(len(freezing_start)):
+    msCamix = int(freezing_start[ix]/40*30 + syn) # miniscope, notebokk 간의 syn 조정
+    tmp_matrix = np.sum(signal_matrix[:,2,int(msCamix-30*tr):int(msCamix+30*tr)], axis = 1)
+    signal_sum += tmp_matrix # signal total matrix 생성
+    
+    signal_freezing_by.append(np.sum(tmp_matrix))
+    
+    tmp3 = np.sum(tmp_matrix * overlap_mask)
+    signal_freezing_by_overlap_filter.append(tmp3)
+    freeizng_freeizng_by.append((freeizng_index[ix,1]-freeizng_index[ix,0])/40)
+
+
+# training session siganl을 training에 저장하고, signal_sum(freezing 시작 부위 signal)과 overlap
+    
+
+overlap = np.sum(signal_sum * training > 0)/np.sum(signal_sum > 0)
+print(overlap)
+
+# In[] freezing index load for day3
+syn = 122 # notebook 1 frame 때, miniscope frame
+#tr = 1 # time range
+filepath = 'F:\\Miniscope imaging data\\Analysis\\201808\\GPF201808_#1.4_CtxA\\GPF201808_#1.4_CtxA_day4_freezing.xlsx'
+df1 = pd.read_excel(filepath, header=None)
+
+freeizng_index2 = np.array(df1.iloc[2:,0:2])
+freezing_start2 = list(freeizng_index2[:,0])
+
+#plot_ms = np.zeros(30*tr*2)
+signal_sum2 = np.zeros(signal_matrix.shape[0])
+
+signal_freezing_by2 = list()
+signal_freezing_by_overlap_filter2 = list()
+freeizng_freeizng_by2 = list()
+
+training = np.sum(signal_matrix[:,1,600:7860],axis=1) # training sesion matrix 
+
+for ix in np.arange(len(freezing_start2)):
+    msCamix = int(freezing_start2[ix]/40*30 + syn) # miniscope, notebokk 간의 syn 조정
+    tmp_matrix = np.sum(signal_matrix[:,3,int(msCamix-30*tr):int(msCamix+30*tr)], axis = 1)
+    signal_sum2 += tmp_matrix # signal total matrix 생성
+    
+    signal_freezing_by2.append(np.sum(tmp_matrix))
+    
+    overlap_mask = (tmp_matrix * training > 0)
+    tmp3 = np.sum(tmp_matrix * overlap_mask)
+    signal_freezing_by_overlap_filter2.append(tmp3)
+    freeizng_freeizng_by2.append((freeizng_index2[ix,1]-freeizng_index2[ix,0])/40)
 
 # In[]
     
-save_neuron, save_signal = overlapping_calc(itg_idx_start)
-
-# In[] up regulate neuron만 선별, dafaFrame indexing 방법은 계속 사용, code 자체는 쓸모없음 
-
-
-day_name_idx = {0 : 'day 1 to 2', 1 : 'day 2 to 3', 2: 'day 3 to 4', 3: 'day4'}
-matrix1 = itg_idx_start
-
-row_idx = ['up_regulated_neuron', 'down_regulated_neuron', 'same_regulated_neuron', 'up_regulated_signal', 'down_regulated_signal']
-col_idx = list()
-for ix in np.arange(len(day_name_idx)):
-    col_idx.append(day_name_idx[ix])
-
-save_df = pd.DataFrame([], index = row_idx, columns = col_idx)
-
-#
-up_regulated_index = list()
-#
-
-for dayA in np.arange(matrix1.shape[1]-1):
-    up_regulated_neuron = 0
-    up_regulated_signal = 0
-    down_regulated_neuron = 0
-    down_regulated_signal = 0
-    same_regulated_neuron = 0
+A = tuple(freeizng_freeizng_by + freeizng_freeizng_by2)
+B1 = tuple(signal_freezing_by_overlap_filter + signal_freezing_by_overlap_filter2)
+B2 = tuple(signal_freezing_by + signal_freezing_by2)
     
-    for nueronNum in np.arange(matrix1.shape[0]):
-        signal_A = matrix1.iloc[nueronNum, dayA]
-        signal_B = matrix1.iloc[nueronNum, dayA+1]
-        if signal_A == 0 and signal_B == 0:
-            pass
-        elif signal_B > signal_A: # up
-            up_regulated_neuron += 1
-            up_regulated_signal += signal_B-signal_A
-            if signal_B-signal_A < 1:
-                print ('up condition has minus value, it should be checked')
-                
-                #
-            if dayA == 1: # day 2 to 3에서 up_regulation된 neuron indexing
-                up_regulated_index.append(nueronNum)
-                #
-        elif signal_A > signal_B: # down
-            down_regulated_neuron += 1
-            down_regulated_signal += signal_A-signal_B
-            if signal_A-signal_B < 1:
-                print ('down condition has minus value, it should be checked')
-                
-        elif signal_A  == signal_B: # same
-            same_regulated_neuron += 1
-            
-        else:
-            print ('unexpected codition')
-            
-        
-        save_df.loc['up_regulated_neuron',day_name_idx[dayA]] = up_regulated_neuron
-        save_df.loc['down_regulated_neuron',day_name_idx[dayA]] = down_regulated_neuron
-        save_df.loc['same_regulated_neuron',day_name_idx[dayA]] = same_regulated_neuron
-        save_df.loc['up_regulated_signal',day_name_idx[dayA]] = up_regulated_signal
-        save_df.loc['down_regulated_signal',day_name_idx[dayA]] = down_regulated_signal
-        
-        
-# In[] 특정한 neuron list를 받아서, neuron , signal overlap meatrix 만듬 
-            
-def overlapping_calc_specific_neurons(matrix1, neurons_list): # pandas dataframe
-    neurons_list = neurons_list
-    days_num = matrix1.shape[1]
-#    itg_idx_len = matrix1.shape[0]
-    
-    save_neuron = np.zeros((days_num,days_num))
-    save_signal = np.zeros((days_num,days_num))
-    
-    for dayA in np.arange(days_num):
-        for dayB in np.arange(days_num):
-            dayA_siganl = np.array(matrix1.iloc[:,dayA])
-            dayB_siganl = np.array(matrix1.iloc[:,dayB])
-            
-            neuron_both_cnt = 0
-            neuron_A_cnt = 0
-            neuron_total_cnt = 0
-            
-            signal_diff_cnt = 0
-            signal_A_cnt = 0
-            signal_total_cnt = 0
-            for ix in neurons_list:              
-                if (dayA_siganl[ix] > 0 and dayB_siganl[ix] > 0): # both signal A ∩ B 
-                    neuron_both_cnt += 1
-                
-                if dayA_siganl[ix] > 0:
-                    neuron_A_cnt += 1 # A signal
-                
-                if (dayA_siganl[ix] > 0 or dayB_siganl[ix] > 0):
-                    neuron_total_cnt += 1
-                    
-                    
-                    
-                    signal_diff_cnt += abs(dayA_siganl[ix]-dayB_siganl[ix])
-       
-            save_neuron[dayA,dayB] = neuron_both_cnt/neuron_total_cnt # A, B의 'neuron' overlap ratio = A neuron ∩ B neuron / A neuron
-            save_signal[dayA,dayB] = signal_diff_cnt/neuron_total_cnt # A, B의 'signal' overlap ratio = 1 - (|(A signal - B signal)| / A signal)
-            
-    
-    return save_neuron, save_signal 
-        
-save_neuron2, save_signal2 = overlapping_calc_specific_neurons(itg_idx_start,up_regulated_index)
-    
-# In[] 2,3,4에 겹치는 neuron들이 1,2와 비교하여 3, 4에서 signal이 얼마나 많은지 
-
-# 
-neurons_list = list()
-mxtrix1 = itg_idx_start
-itg_idx_len = matrix1.shape[0]
-days_num = matrix1.shape[1]
+print(tr, pearsonr(A,B1), pearsonr(A,B2))
 
 
-save_saignal_num = np.zeros([days_num])
 
-#for ix in np.arange(itg_idx_len):        
-#    if (mxtrix1.iloc[ix,1] > 0 and mxtrix1.iloc[ix,2] > 0, mxtrix1.iloc[ix,3] > 0): # both signal A ∩ B 
-#        neurons_list.append(ix)
+# In[]
+    
+zeromean(signal_sum2)
+zeromean(signal_sum)
 
-for dayA in np.arange(days_num):
-    signal1 = 0
-    signal_total = 0
+np.sum(np.sum(signal_matrix[:,3,1:4368], axis = 0))/((4368-1)/30)
+np.sum(signal_sum2)/(len(freezing_start2)*2)
+
+np.sum(np.sum(signal_matrix[:,2,740:4752], axis = 0))/((4752-740)/30)
+np.sum(signal_sum)/(len(freezing_start)*2)
+
+np.sum((signal_sum * (training >  0)) > 0)/np.sum(signal_sum > 0)
+np.sum((signal_sum2 * (training >  0)) > 0)/np.sum(signal_sum2 > 0)
+
+test1 = np.sum(signal_matrix[:,2,740:4752], axis = 1)
+test2 = np.sum(signal_matrix[:,3,1:4368], axis = 1)
+
+np.sum((training * test2) > 0)/np.sum(test2 > 0)
+np.sum((training * test1) > 0)/np.sum(test1 > 0)
+
+plt.hist(A, bins = 50)
+
+
+#plt.eventplot(signal_matrix[:,2,740:4752])
+# In[]
+
+# signal matrix
+test1_matrix = signal_matrix[:,2,:]
+
+# freezing bar
+syn = 14
+mask_freezing = np.zeros((1, signal_matrix.shape[2]))
+freezing_index = freeizng_index
+#print(np.sum(mask_freeeizng))
+for ix in np.arange(len(freezing_index)):
+    msCamix = int(freezing_index[ix,0]/40*30 + syn) # miniscope, notebokk 간의 syn 조정
+    msCamix_end = int(freezing_index[ix,1]/40*30 + syn)
     
-    merge_cnt = 0
-    total_cnt = 0
+    mask_freezing[0,msCamix:msCamix_end] = 1
     
-    for ix in np.arange(itg_idx_len):
-        signal_total += mxtrix1.iloc[ix,dayA]
-        
-        if (mxtrix1.iloc[ix,1] > 0 and mxtrix1.iloc[ix,2] > 0 and mxtrix1.iloc[ix,3] > 0):
-            merge_cnt += 1
-            signal1 += mxtrix1.iloc[ix,dayA]
-        
-        total_cnt += 1
-        
-        
-    save_saignal_num[dayA] = signal1/signal_total
+  
+# binning 
+    
+timebin = 10 # frames/bin
+y_axis = int(test1_matrix.shape[1]/timebin)
+im_matrix = np.zeros((test1_matrix.shape[0],y_axis))
+im_freezing = np.zeros((1,y_axis))
+for bin1 in np.arange(y_axis):
+    if bin1 == y_axis-1:
+        im_matrix[:,bin1] = np.sum(test1_matrix[:,timebin*bin1:], axis = 1)
+        im_freezing[0,bin1] = np.sum(mask_freezing[:,timebin*bin1:], axis = 1) > 0
+    else:
+        im_matrix[:,bin1] = np.sum(test1_matrix[:,timebin*bin1:timebin*(bin1+1)], axis = 1)
+        im_freezing[0,bin1] = np.sum(mask_freezing[:,timebin*bin1:timebin*(bin1+1)], axis = 1) > 0
+
+limit_s = int(740/timebin)
+limit_e = int(4752/timebin)
+
+max_height = int(np.max(np.sum(im_matrix, axis = 0)))
+frth = np.zeros((max_height,y_axis))
+for ix in np.arange(im_matrix.shape[1]):
+    frth[0:int(np.sum(im_matrix[:,ix])), ix] = 1
+    
+f, (ax1, ax2, ax3) = plt.subplots(3, 1)
+ax1.imshow(im_matrix[:,limit_s:limit_e], aspect='auto', cmap='gray')
+ax1.set_title('Raster plot')
+ax1.set_ylabel('neuron ID')
+ax2.imshow(frth[:,limit_s:limit_e], aspect='auto', origin='lower', cmap='gray')
+ax2.set_title('Firing-rate-time-histogram (FRTH)')
+ax2.yaxis.set_visible(False)
+
+ax3.set_title('Freezing')
+ax3.imshow(im_freezing[:,limit_s:limit_e], aspect='auto', cmap='gray')
+ax3.yaxis.set_visible(False)
+
+# x axis좀 맞춰봐... ㅠㅠ 
+
+# In[] 시간대비 signal/neuron 비율 계산 
+test1
+test1_matrix = signal_matrix[:,2,740:4740]
+
+
+# total
+np.sum(test1)/np.sum(test1>0)
+
+
+# 1/10
+bins = 5.12
+total_time = test1_matrix.shape[1]
+framebins = int(total_time/bins)
+
+signal_n = list()
+neuron_n = list()
+for ix in np.arange(bins):
+    tmp3 = np.sum(test1_matrix[:,int(framebins*ix):int(framebins*(ix+1))], axis =1)
+    signal_n.append(np.sum(tmp3))
+    neuron_n.append(np.sum(tmp3>0))
+#    print(int(framebins*ix),int(framebins*(ix+1)))
+
+ratio = np.array(signal_n)/np.array(neuron_n)
+print( bins, np.nanmean(ratio))
+
+
+
+total_time/(len(freeizng_freeizng_by)*2*30)
+
+# In[] freezing cells 들이 freezing(start), freezing이 아닌 non-freezing에서 나타나는 비율
+
+
+freezing_cells_index = (signal_sum * training) > 0
+freezing_index = freeizng_index # 오타 수정 
+tr = 1.3 # time range
+syn = 14
+
+trainig_timelimit = tuple([640, 7860])
+test1_timelimit = tuple([740, 4752])
+
+signal_matrix
+
+##
+
+
+# freezing(start) session masking
+mask_freeizng_start = np.zeros((1, signal_matrix.shape[2])) # miniscope
+for ix in np.arange(len(freezing_index)): # notebook
+    msCamix = int(freezing_index[ix,0]/40*30 + syn) # miniscope, notebokk 간의 syn 조정
+    mask_freeizng_start[0,int(msCamix-30*tr):int(msCamix+30*tr)] = 1
     
 
-save_total_neuronNum = np.zeros(days_num)
-
-for dayA in np.arange(days_num):
-    total_neuron_num = 0
-    for ix in np.arange(itg_idx_len):
-        if mxtrix1.iloc[ix,dayA] > 0:
-            total_neuron_num += 1
-        
-    save_total_neuronNum[dayA] = total_neuron_num
+# freezing session masking (without start point)
+mask_freeizng = np.zeros((1, signal_matrix.shape[2]))
+#print(np.sum(mask_freeeizng))
+for ix in np.arange(len(freezing_index)):
+    msCamix = int(freezing_index[ix,0]/40*30 + syn) # miniscope, notebokk 간의 syn 조정
+    msCamix_end = int(freezing_index[ix,1]/40*30 + syn)
     
+    mask_freeizng[0,msCamix:msCamix_end] = 1
     
+#print(np.sum(mask_freeeizng))
+mask_freeizng = mask_freeizng - (mask_freeizng * mask_freeizng_start > 0)
+#print(np.sum(mask_freeeizng))
+
+# non_freezing session masking
+
+non_freeizng = np.ones((1, signal_matrix.shape[2]))
+#print(np.sum(non_freeeizng))
+non_freeizng = non_freeizng - mask_freeizng
+#print(np.sum(non_freeeizng))
+non_freeizng = non_freeizng - mask_freeizng_start
+#print(np.sum(non_freeeizng))
+
+# visualization
+f, (ax1, ax2, ax3) = plt.subplots(3, 1)
+ax1.imshow(mask_freeizng_start[:,740:4752], aspect='auto', cmap='gray')
+ax2.imshow(mask_freeizng[:,740:4752], aspect='auto', cmap='gray')
+ax3.imshow(non_freeizng[:,740:4752], aspect='auto', cmap='gray')
+
+mask_freeizng_start, mask_freeizng, non_freeizng
+
+# total 단위 : signal/s
+np.sum(np.sum(signal_matrix[:,2,740:4752] * mask_freeizng_start[:,740:4752], axis=1))/(np.sum(mask_freeizng_start[:,740:4752])/30)
+np.sum(np.sum(signal_matrix[:,2,740:4752] * mask_freeizng[:,740:4752], axis=1))/(np.sum(mask_freeizng[:,740:4752])/30)
+np.sum(np.sum(signal_matrix[:,2,740:4752] * non_freeizng[:,740:4752], axis=1))/(np.sum(non_freeizng[:,740:4752])/30)
+#f, (ax1, ax2, ax3) = plt.subplots(3, 1)
+#ax1.imshow(signal_matrix[:,2,:], aspect='auto', cmap='gray')
+#ax2.imshow((signal_matrix[:,2,:] * mask_freeeizng_start), aspect='auto', cmap='gray')
+#ax3.imshow(mask_freeeizng_start, aspect='auto', cmap='gray')
+
+# freezing cells only
+
+np.sum(np.sum(signal_matrix[:,2,740:4752] * mask_freeizng_start[:,740:4752], axis=1)*freezing_cells_index)/(np.sum(mask_freeizng_start[:,740:4752])/30)
+np.sum(np.sum(signal_matrix[:,2,740:4752] * mask_freeizng[:,740:4752], axis=1)*freezing_cells_index)/(np.sum(mask_freeizng[:,740:4752])/30)
+np.sum(np.sum(signal_matrix[:,2,740:4752] * non_freeizng[:,740:4752], axis=1)*freezing_cells_index)/(np.sum(non_freeizng[:,740:4752])/30)
+
+
+
+v1 = np.sum(np.transpose(np.transpose(signal_matrix[:,2,740:4752]) * freezing_cells_index), axis=0)
+v2 = np.zeros((1,v1.shape[0]))
+v2[0,:] = v1
+
+for ix in np.arange(len(freezing_index)):
+    msCamix = int(freezing_index[ix,0]/40*30 + syn) # miniscope, notebokk 간의 syn 조정
+    msCamix_end = int(freezing_index[ix,1]/40*30 + syn)
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    # In[]
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    mask_freeizng[0,msCamix:msCamix_end] = 1
 
-
-# In[]   
+f, (ax1, ax2) = plt.subplots(2, 1)
+ax1.imshow(mask_freeizng[:,740:4752], aspect='auto', cmap='gray')
+ax1.yaxis.set_visible(False)
+ax2.imshow(v2, aspect='auto', cmap='gray')
+ax2.yaxis.set_visible(False)
 
 
 
@@ -395,17 +345,4 @@ for dayA in np.arange(days_num):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                           

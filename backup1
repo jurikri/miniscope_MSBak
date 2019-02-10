@@ -173,14 +173,12 @@ def engram_correlation(se, engrem, b2m_syn, bins, freezing_matrix, timelimit_min
         R = pearsonr(freezing_se, activity_se_engram)
     return(R, freezing_se, activity_se_engram)
 
-# In[]
+# In[] Individual로 correlation이 +인 것들을 모아서 engram으로 판단 
 # 고정 var 
 b2m_syn = list([0,16.5,13.375,121.125])
 bins = 6*30 # 12초
 
 se = 2
-engram = [1,35,68,52]
-
 save1 = np.zeros((signal_matrix.shape[0],2))
 for neuron in range(signal_matrix.shape[0]):
     engram = list([neuron])
@@ -202,22 +200,64 @@ R, freezing_se, activity_se_engram = engram_correlation \
 
 print(R)
 
+# In[] engram의 특이성 찾기 
+engram_mask = np.zeros(signal_matrix.shape[0])
+for neuron in range(signal_matrix.shape[0]):
+    if neuron in engram:
+        engram_mask[neuron] = 1
+
+engram_num = np.sum(engram_mask)
+
+test1_fr = zeromean(np.sum(signal_matrix[:,2,:], axis=1))
+test1_engram_fr = zeromean(np.sum(signal_matrix[:,2,:], axis=1) * engram_mask)
+
+training1_fr = zeromean(np.sum(signal_matrix[:,1,:], axis=1))
+training1_engram_fr = zeromean(np.sum(signal_matrix[:,1,:], axis=1) * engram_mask)
+
+pre1_fr = zeromean(np.sum(signal_matrix[:,2,:], axis=1))
+pre1_engram_fr = zeromean(np.sum(signal_matrix[:,2,:], axis=1) * engram_mask)
+
+pre1_fr = zeromean(np.sum(signal_matrix[:,0,:], axis=1))
+pre1_engram_fr = zeromean(np.sum(signal_matrix[:,0,:], axis=1) * engram_mask)
 
 
+# test1의 engram이 test2에도 맞는지 확인 
+se = 3
+R, freezing_se, activity_se_engram = engram_correlation \
+    (se, engram, b2m_syn, bins, freezing_matrix, timelimit_miniscope, timelimit_behavior)
+print(R)
+
+# overlap ratio 확인
+tr1_te1_overlap = np.sum(np.sum(signal_matrix[:,1,:],axis=1) * np.sum(signal_matrix[:,2,:], axis=1)>0)
+te1_total = np.sum(np.sum(signal_matrix[:,2,:],axis=1)>0)
+tr1_te1_engram_overlap = np.sum((np.sum(signal_matrix[:,1,:],axis=1) * engram_mask )>0)
+
+tr1_te1_overlap/te1_total
+tr1_te1_engram_overlap/te1_total
 
 
+# In[] test2 engram
+se = 0
+save2 = np.zeros((signal_matrix.shape[0],2))
+for neuron in range(signal_matrix.shape[0]):
+    engram = list([neuron])
 
 
+    R, freezing_se, activity_se_engram = engram_correlation \
+    (se, engram, b2m_syn, bins, freezing_matrix, timelimit_miniscope, timelimit_behavior)
 
+    save2[neuron,0] = neuron
+    save2[neuron,1] = R[0]
+    
+engram = list()    
+for neuron in range(signal_matrix.shape[0]):
+    if save1[neuron,1] > 0:
+        engram.append(neuron)
 
+R, freezing_se, activity_se_engram = engram_correlation \
+    (se, engram, b2m_syn, bins, freezing_matrix, timelimit_miniscope, timelimit_behavior)
 
-
-
-
-
-
-
-
+print(R)
 
 
 

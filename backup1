@@ -1,0 +1,239 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Feb 10 14:03:52 2019
+
+@author: msbak
+"""
+
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jan 29 10:10:27 2019
+
+@author: msbak
+"""
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.stats.stats import pearsonr # correlation 계산 용  
+import hdf5storage # mat file load 용 
+import math # nan 판단 용 
+
+# In[] 사용자 정의 함수
+def linearization(matrix):
+    output = np.zeros((1,matrix.shape[0]*matrix.shape[1]))
+    ix = 0
+    for row in range(matrix.shape[0]):
+        for col in range(matrix.shape[1]):
+            output[0,ix] = matrix[row,col]
+            ix += 1
+            
+    return output
+
+def zeromean(array):
+    sum1 = 0
+    cnt = 0
+    for value1 in array:
+        if not (value1==0):
+            sum1 += value1
+            cnt += 1
+            
+    zeromean = sum1/cnt
+    return zeromean
+
+# In[] itgidx, signal data import
+    
+# itgidx
+# mat structure에 대한 접근이 어려우니, 임의로 cell reg의 ouput을 excel file에 저장하여 python으로 load 
+filepath1 = 'itgidx.xlsx'
+itgidx = np.array(pd.read_excel(filepath1, header=None))
+
+# signal
+# signal sorting 된 mat file을 load, 경로는 수동 지정 
+loadlist = list(['GPF201808_#1.4_CtxA_day1_SignalMatrix.mat', \
+                 'GPF201808_#1.4_CtxA_day2_SignalMatrix.mat', \
+                 'GPF201808_#1.4_CtxA_day3_SignalMatrix.mat', \
+                 'GPF201808_#1.4_CtxA_day4_SignalMatrix.mat', ])
+        
+# 우선 한번 돌려서, 크기를 알아낸뒤 pre allocation 함.
+max_session_time = 0
+for filename in np.arange(len(loadlist)):
+    mat_tmp = hdf5storage.loadmat(loadlist[filename])
+    mat_signal_tmp = mat_tmp['msPeak_signal']
+    if max_session_time < mat_signal_tmp.shape[1]:
+        max_session_time = mat_signal_tmp.shape[1]
+                
+#msPeak_signal = np.zeros((len(loadlist),max_session_,max_session_time)) # 추후 수정요망 
+signal_matrix = np.zeros((itgidx.shape[0],itgidx.shape[1],max_session_time))
+
+# 개별 session 을 load 한뒤, signal_matrix에 cell reg 정렬된 상태로 넣음. 
+for filename in np.arange(len(loadlist)):
+    mat_tmp = hdf5storage.loadmat(loadlist[filename])
+    mat_signal_tmp = mat_tmp['msPeak_signal']
+
+    for neuron in np.arange(mat_signal_tmp.shape[0]): 
+        itg_index = list(itgidx[:,filename]).index(neuron+1) # matlab to python
+        # cell reg의 index를 이용하여 재정렬 
+        signal_matrix[itg_index,filename,0:mat_signal_tmp.shape[1]] = mat_signal_tmp[neuron,:] # filename = session 
+        if not(filename==0) and itg_index == 0:
+            print(filename, neuron, itg_index )
+            
+
+# In[] timelimit import
+filepath3 = 'framelimit.xlsx' # 실험시간 정보 import
+timelimit = (pd.read_excel(filepath3, header=None))    
+timelimit_miniscope = np.array(timelimit.iloc[3:7,1:3])
+timelimit_behavior = np.array(timelimit.iloc[3:7,4:6])    
+     
+# In[] behavior data import -> behavior_matrix 
+
+prepath = 'Miniscope_GPF201808_#1.4_tracking_data\\'
+loadlist2 = list([prepath+'GPF201808_#1.4_CtxA_day1.mp4_extraction.avi_tracking.xlsx', \
+                  prepath+'GPF201808_#1.4_CtxA_day2.mp4_extraction.avi_tracking.xlsx', \
+                  prepath+'GPF201808_#1.4_CtxA_day3.mp4_extraction.avi_tracking.xlsx', \
+                  prepath+'GPF201808_#1.4_CtxA_day4.mp4_extraction.avi_tracking.xlsx'])
+
+# 우선 한번 돌려서, 크기를 알아낸뒤 pre allocation 함.
+max_behavior_time = 0
+for i in range(len(loadlist2)):
+    behavior_tmp1 = np.array(pd.read_excel(loadlist2[i], header=None))
+#    behavior_tmp2 = np.array(behavior_tmp1.iloc[33:,2:4])
+    if behavior_tmp1.shape[0] > max_behavior_time:
+        max_behavior_time = behavior_tmp1.shape[0]
+
+behavior_matrix = np.zeros((max_behavior_time,2,len(loadlist2)))
+
+for i in range(len(loadlist2)):
+    behavior_tmp1 = pd.read_excel(loadlist2[i], header=None)
+#    behavior_tmp2 = np.array(behavior_tmp1.iloc[33:,2:4])
+#    behavior_tmp3 = np.array(fill(behavior_tmp2))
+    behavior_matrix[0:behavior_tmp1.shape[0],:,i] = np.array(behavior_tmp1)
+    
+# In[] freezing data import
+    
+prepath = 'freezing\\'
+loadlist3 = list([prepath+'GPF201808_#1.4_CtxA_day1.mp4_extraction.avi_freezing.xlsx', \
+                  prepath+'GPF201808_#1.4_CtxA_day2.mp4_extraction.avi_freezing.xlsx', \
+                  prepath+'GPF201808_#1.4_CtxA_day3.mp4_extraction.avi_freezing.xlsx', \
+                  prepath+'GPF201808_#1.4_CtxA_day4.mp4_extraction.avi_freezing.xlsx'])
+
+freezing_matrix = list()
+for se in range(len(loadlist3)):
+    tmp1 = pd.read_excel(loadlist3[se], header=None)
+    freezing_matrix.append(np.array(tmp1))
+
+# In[] 사용자 정의함수2
+
+
+
+def engram_correlation(se, engrem, b2m_syn, bins, freezing_matrix, timelimit_miniscope, timelimit_behavior):
+    s = timelimit_miniscope[se,0]
+    e = timelimit_miniscope[se,1]
+    tr = np.arange(s,e,bins)
+    tr[-1] = e
+    
+    freezing_bar = np.zeros(freezing_matrix[se][-1][-1])
+    for ix in range(len(freezing_matrix[se])):
+        freezing_bar[freezing_matrix[se][ix][0]:freezing_matrix[se][ix][1]] = 1
+    
+    freezing_se = list()
+    activity_se_engram = list()
+    activity_se_non_engram = list()
+    
+    for bin1 in range(len(tr)-1):
+        s = tr[bin1]
+        e = tr[bin1+1]
+        s_behav = int(round(s/30*40+b2m_syn[se]))
+        e_behav = int(round(e/30*40+b2m_syn[se]))
+        s = int(round(s))
+        e = int(round(e))
+        
+        c1 = timelimit_miniscope[se,0] <= s and timelimit_miniscope[se,1] >= e
+        c2 = timelimit_behavior[se,0] <= s_behav and timelimit_behavior[se,1] >= e_behav
+        
+#        print(c1,c2)
+        
+        if c1 and c2:
+            f_percent = np.sum(freezing_bar[s_behav:e_behav])/(e_behav-s_behav)
+            freezing_se.append(f_percent)
+            
+            activity_se_tmp = 0
+            activity_se_non_tmp = 0
+            for neuron in range(signal_matrix.shape[0]):
+                fr = np.sum(signal_matrix[neuron,se,s:e])
+                if neuron in engram:
+                    activity_se_tmp += fr
+                elif not (neuron in engram):
+                    activity_se_non_tmp  += fr
+            
+            activity_se_engram.append(activity_se_tmp)
+            activity_se_non_engram.append(activity_se_non_tmp)
+                    
+            
+        R = pearsonr(freezing_se, activity_se_engram)
+    return(R, freezing_se, activity_se_engram)
+
+# In[]
+# 고정 var 
+b2m_syn = list([0,16.5,13.375,121.125])
+bins = 6*30 # 12초
+
+se = 2
+engram = [1,35,68,52]
+
+save1 = np.zeros((signal_matrix.shape[0],2))
+for neuron in range(signal_matrix.shape[0]):
+    engram = list([neuron])
+
+
+    R, freezing_se, activity_se_engram = engram_correlation \
+    (se, engram, b2m_syn, bins, freezing_matrix, timelimit_miniscope, timelimit_behavior)
+
+    save1[neuron,0] = neuron
+    save1[neuron,1] = R[0]
+    
+engram = list()    
+for neuron in range(signal_matrix.shape[0]):
+    if save1[neuron,1] > 0:
+        engram.append(neuron)
+
+R, freezing_se, activity_se_engram = engram_correlation \
+    (se, engram, b2m_syn, bins, freezing_matrix, timelimit_miniscope, timelimit_behavior)
+
+print(R)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

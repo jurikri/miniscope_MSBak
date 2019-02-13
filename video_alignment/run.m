@@ -7,6 +7,7 @@ file_nm = []; path = []; [file_nm, path] = uigetfile(fullfile(path, '*.*')); fil
 for i = size(file_nm,2):-1:1
     if file_nm(i) == '.'
         extenstion_nm = file_nm(1,i:size(file_nm,2));
+        break
     end
 end
 
@@ -19,22 +20,29 @@ if strcmp(extenstion_nm, '.lsm')
     end
 
 elseif strcmp(extenstion_nm, '.tif')
-    disp('Ãß°¡ ¿¹Á¤Áß..')
-    
+    tiff_info = imfinfo(fileName);
+    for frame = 1:size(tiff_info,1)
+        msFrame(:,:,frame) = imread(fileName,frame);
+    end
+       
 elseif strcmp(extenstion_nm, '.avi')
-    disp('Ãß°¡ ¿¹Á¤Áß..')
+    v = VideoReader(fileName);
+    for frame = 1: v.NumberOfFrames
+        tmpFrame = double(v.read(frame));
+        msFrame(:,:,frame) = tmpFrame(:,:,1);
+    end
 else
     disp('This extenstion type is not supported')
 end
 
-%% Àü¿ªº¯¼ö ¼³Á¤
+%% ì „ì—­ë³€ìˆ˜ ì„¤ì •
 
 rs = size(msFrame,1); %% row, height size
 cs = size(msFrame,2); %% col, width size
-cm = pre_linear_model(rs, cs); %% frame shift ÇÒ linear modelÀ» »çÀü¿¡ ¸¸µé¾î¼­ cm construct º¯¼ö¿¡ ÀúÀåÇÔ. 
+cm = pre_linear_model(rs, cs); %% frame shift í•  linear modelì„ ì‚¬ì „ì— ë§Œë“¤ì–´ì„œ cm construct ë³€ìˆ˜ì— ì €ì¥í•¨. 
 
-%% ÃÖÀû º¸Á¤ °ª Ã£±â
-ref = mean(double(msFrame),3); % ref´Â total meanÀ» ¼³Á¤ÇÏ¿´À½.
+%% ìµœì  ë³´ì • ê°’ ì°¾ê¸°
+ref = mean(double(msFrame),3); % refëŠ” total meanì„ ì„¤ì •í•˜ì˜€ìŒ.
 for frame = 1:size(msFrame,3)
     img = double(msFrame(:,:,frame));
 
@@ -44,15 +52,15 @@ for frame = 1:size(msFrame,3)
     fix_info_col(:,:,frame) = cm.cmcola(:,:,ms.Cixo)+cm.cmcolb(:,:,ms.Dixo);
 end
 
-%% º¸Á¤°ªÀ» ÀÌ¿ëÇÏ¿© frame º¸Á¤ÇÏ±â
+%% ë³´ì •ê°’ì„ ì´ìš©í•˜ì—¬ frame ë³´ì •í•˜ê¸°
 for frame = 1:size(msFrame,3)
     fix1 = correction_fill_secondstep(msFrame(:,:,frame), fix_info_row(:,:,frame), fix_info_col(:,:,frame));
     fixFrame(:,:,frame) = fix1;
 end
 
-implay(uint8(fixFrame)) % º¸Á¤µÈ frameÀ» matlab ³»¿¡¼­ Àç»ı
+implay(uint8(fixFrame)) % ë³´ì •ëœ frameì„ matlab ë‚´ì—ì„œ ì¬ìƒ
 
-%% ±âÁ¸ Æò¸éº¸Á¤ code Ãß°¡ Àû¿ë 
+%% ê¸°ì¡´ í‰ë©´ë³´ì • code ì¶”ê°€ ì ìš© 
 matrix1 = fixFrame;
 rotate_index = rotate_index_Generator(20); 
 
@@ -85,7 +93,7 @@ end
 
 implay(uint8(ali_frame))
 
-%% ¾Æ·¡ºÎÅÍ´Â ÀúÀåÀåÄ¡·Î Ãâ·Â¿¡ °üÇÑ code
+%% ì•„ë˜ë¶€í„°ëŠ” ì €ì¥ì¥ì¹˜ë¡œ ì¶œë ¥ì— ê´€í•œ code
 
 timeName = datetimeGeneretor();
 
